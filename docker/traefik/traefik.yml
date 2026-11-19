@@ -1,0 +1,66 @@
+# ==============================================================================
+# Dexta Africa Enterprise Traefik v3 Static Configuration
+# ==============================================================================
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Traefik API and Operational Dashboard
+api:
+  dashboard: true
+  insecure: false
+
+# Entry points: HTTP (:80) and HTTPS (:443)
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+    http2:
+      maxConcurrentStreams: 250
+    http3:
+      advertisedPort: 443
+
+# Automated ACME SSL/TLS Certificates (Let's Encrypt)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "${SSL_EMAIL:-devops@dextaafrica.com}"
+      storage: "/etc/traefik/acme/acme.json"
+      httpChallenge:
+        entryPoint: web
+
+# Dynamic configuration providers (Docker Labels + Dynamic Files)
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "dexta_network"
+    watch: true
+
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: true
+
+# Logging & Telemetry
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  format: json
+  bufferingSize: 100
+  filters:
+    statusCodes:
+      - "200-599"

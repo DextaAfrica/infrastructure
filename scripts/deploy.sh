@@ -71,12 +71,16 @@ until docker compose -f "$ROOT_DIR/docker-compose.yml" ps admin-portal --filter 
 done
 echo -e "${GREEN}[OK]${NC} Core Backend, Frontend Web, and Admin Portal are fully operational."
 
-# 6. Initialize SSL and Edge Reverse Proxy
-echo -e "\n${BLUE}[Step 6/6]${NC} Initializing SSL certificates and ingress routing..."
+# 6. Initialize Traefik Ingress Gateway and Mail Relay
+echo -e "\n${BLUE}[Step 6/6]${NC} Initializing Traefik Ingress Gateway, Maintenance Engine, and Postfix..."
 "$SCRIPT_DIR/init-ssl.sh"
 
-# Start Certbot auto-renewal background worker
-docker compose -f "$ROOT_DIR/docker-compose.yml" up -d certbot
+docker compose -f "$ROOT_DIR/docker-compose.yml" up -d traefik maintenance-page postfix
+
+echo -e "Waiting for Traefik Ingress to achieve healthy status..."
+until docker compose -f "$ROOT_DIR/docker-compose.yml" ps traefik --filter "status=running" | grep -q "healthy"; do
+    sleep 2
+done
 
 echo -e "\n${GREEN}======================================================================${NC}"
 echo -e "${GREEN}     Dexta Africa Infrastructure Deployment Successfully Completed!    ${NC}"

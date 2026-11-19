@@ -1,60 +1,75 @@
 services:
   # ============================================================================
-  # 1. Edge Reverse Proxy & Ingress Gateway (Nginx)
+  # 1. Edge Reverse Proxy & Ingress Gateway (Traefik v3)
   # ============================================================================
-  reverse-proxy:
-    build:
-      context: ./docker/nginx
-      dockerfile: Dockerfile
-    container_name: dexta_reverse_proxy
+  traefik:
+    image: traefik:v3.2
+    container_name: dexta_traefik
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
     environment:
-      - DOMAIN=${DOMAIN:-dextaafrica.com}
-      - WWW_DOMAIN=${WWW_DOMAIN:-www.dextaafrica.com}
-      - ADMIN_DOMAIN=${ADMIN_DOMAIN:-admin.dextaafrica.com}
-      - OPS_DOMAIN=${OPS_DOMAIN:-ops.dextaafrica.com}
-      - API_DOMAIN=${API_DOMAIN:-api.dextaafrica.com}
-      - MAINTENANCE_BYPASS_CIDR=${MAINTENANCE_BYPASS_CIDR:-}
+      - SSL_EMAIL=${SSL_EMAIL:-devops@dextaafrica.com}
     volumes:
-      - certbot_conf:/etc/nginx/ssl:ro
-      - certbot_www:/var/www/certbot:ro
-      - nginx_logs:/var/log/nginx
-      - ./docker/nginx/maintenance:/etc/nginx/maintenance
-    depends_on:
-      frontend:
-        condition: service_healthy
-      admin-portal:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./docker/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./docker/traefik/acme:/etc/traefik/acme
     networks:
       - dexta_network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1/healthz || exit 1"]
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================================
+  # 2. Branded 503 Maintenance Page Service
+  # ============================================================================
+  maintenance-page:
+    build:
+      context: ./docker/maintenance
+      dockerfile: Dockerfile
+    container_name: dexta_maintenance
+    restart: unless-stopped
+    networks:
+      - dexta_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.maintenance-service.loadbalancer.server.port=80"
+
+  # ============================================================================
+  # 3. Postfix Mail Relay (Authenticated via Brevo / Sendinblue)
+  # ============================================================================
+  postfix:
+    build:
+      context: ./docker/postfix
+      dockerfile: Dockerfile
+    container_name: dexta_postfix
+    restart: unless-stopped
+    environment:
+      - BREVO_SMTP_HOST=${BREVO_SMTP_HOST:-smtp-relay.brevo.com}
+      - BREVO_SMTP_PORT=${BREVO_SMTP_PORT:-587}
+      - BREVO_SMTP_USER=${BREVO_SMTP_USER:-}
+      - BREVO_SMTP_KEY=${BREVO_SMTP_KEY:-}
+      - MAIL_DOMAIN=${MAIL_DOMAIN:-${DOMAIN:-dextaafrica.com}}
+      - POSTFIX_ALLOWED_NETWORKS=${POSTFIX_ALLOWED_NETWORKS:-}
+    volumes:
+      - postfix_spool:/var/spool/postfix
+    networks:
+      - dexta_network
+    healthcheck:
+      test: ["CMD-SHELL", "postfix status || exit 1"]
+      interval: 20s
       timeout: 5s
       retries: 3
       start_period: 10s
 
   # ============================================================================
-  # 2. Automated SSL/TLS Engine (Certbot)
-  # ============================================================================
-  certbot:
-    image: certbot/certbot:v3.1.0
-    container_name: dexta_certbot
-    restart: unless-stopped
-    volumes:
-      - certbot_conf:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'"
-    networks:
-      - dexta_network
-
-  # ============================================================================
-  # 3. Go Enterprise Core Backend API
+  # 4. Go Enterprise Core Backend API
   # ============================================================================
   backend:
     build:
@@ -81,14 +96,31 @@ services:
       - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL}
       - ADMIN_BOOTSTRAP_EMAIL=${ADMIN_BOOTSTRAP_EMAIL}
       - ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
+      - SMTP_HOST=postfix
+      - SMTP_PORT=587
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
         required: false
-      redis:
+      postfix:
         condition: service_healthy
     networks:
       - dexta_network
+    labels:
+      - "traefik.enable=true"
+      # Subdomain API routing: api.dextaafrica.com
+      - "traefik.http.routers.backend-subdomain.rule=Host(`${API_DOMAIN:-api.dextaafrica.com}`)"
+      - "traefik.http.routers.backend-subdomain.entrypoints=websecure"
+      - "traefik.http.routers.backend-subdomain.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-subdomain.middlewares=secHeaders@file,compressAll@file,rateLimitApi@file"
+      # Path routing: dextaafrica.com/api/
+      - "traefik.http.routers.backend-path.rule=(Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-path.entrypoints=websecure"
+      - "traefik.http.routers.backend-path.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-path.middlewares=secHeaders@file,compressAll@file,rateLimitApi@file"
+      - "traefik.http.services.backend.loadbalancer.server.port=8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/healthz || exit 1"]
       interval: 15s
@@ -97,7 +129,7 @@ services:
       start_period: 15s
 
   # ============================================================================
-  # 4. Next.js High-Performance Frontend Web App
+  # 5. Next.js High-Performance Frontend Web App
   # ============================================================================
   frontend:
     build:
@@ -126,6 +158,13 @@ services:
         condition: service_healthy
     networks:
       - dexta_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend.middlewares=secHeaders@file,compressAll@file,rateLimitGeneral@file"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
       interval: 20s
@@ -134,7 +173,7 @@ services:
       start_period: 20s
 
   # ============================================================================
-  # 5. Next.js Enterprise Operations & Admin Command Portal
+  # 6. Next.js Enterprise Operations & Admin Command Portal
   # ============================================================================
   admin-portal:
     build:
@@ -163,11 +202,11 @@ services:
       - ADMIN_REGISTRATION_PASSCODE=${ADMIN_REGISTRATION_PASSCODE}
       - AUTO_MIGRATE=true
       - AUTO_SEED=true
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
+      # Postfix Local Relay Integration
+      - SMTP_HOST=postfix
+      - SMTP_PORT=587
+      - SMTP_USER=
+      - SMTP_PASS=
       - EMAIL_FROM=${EMAIL_FROM:-operations@dextaafrica.com}
       - AWS_REGION=${AWS_REGION:-auto}
       - AWS_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-}
@@ -179,8 +218,17 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      postfix:
+        condition: service_healthy
     networks:
       - dexta_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`)"
+      - "traefik.http.routers.admin.entrypoints=websecure"
+      - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.admin.middlewares=adminSecHeaders@file,compressAll@file,largeBodyBuffering@file"
+      - "traefik.http.services.admin-portal.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/api/health || exit 1"]
       interval: 20s
@@ -189,7 +237,7 @@ services:
       start_period: 25s
 
   # ============================================================================
-  # 6. Production PostgreSQL Database
+  # 7. Production PostgreSQL Database (Optional when using Cloud Supabase)
   # ============================================================================
   postgres:
     image: postgres:16-alpine
@@ -212,7 +260,7 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # 7. Production Redis Cache & Message Broker
+  # 8. Production Redis Cache & Message Broker
   # ============================================================================
   redis:
     image: redis:7-alpine
@@ -240,12 +288,8 @@ volumes:
     name: dexta_admin_data
   redis_data:
     name: dexta_redis_data
-  certbot_conf:
-    name: dexta_certbot_conf
-  certbot_www:
-    name: dexta_certbot_www
-  nginx_logs:
-    name: dexta_nginx_logs
+  postfix_spool:
+    name: dexta_postfix_spool
 
 # ==============================================================================
 # Isolated Enterprise Network
