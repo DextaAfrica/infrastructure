@@ -34,7 +34,7 @@ help: ## Show this formatted command reference
 setup: ## Initialize directories, .env template, and service repositories
 	@echo -e "$(BLUE)==>$(NC) Running infrastructure setup..."
 	@if [ ! -f .env ]; then cp .env.example .env && echo -e "$(GREEN)[OK]$(NC) Created .env from .env.example (please edit with secrets)"; fi
-	@mkdir -p backups/db docker/nginx/ssl docker/nginx/maintenance services
+	@mkdir -p backups/db docker/traefik/acme docker/traefik/dynamic services
 	@./scripts/setup-services.sh
 
 .PHONY: deploy
@@ -123,7 +123,7 @@ restore: ## Restore database from a backup file (Usage: make restore file=path/t
 # ------------------------------------------------------------------------------
 
 .PHONY: ssl
-ssl: ## Provision or renew Let's Encrypt SSL certificates via Certbot
+ssl: ## Prepare and verify Traefik Let's Encrypt ACME SSL storage
 	@./scripts/init-ssl.sh
 
 # ------------------------------------------------------------------------------

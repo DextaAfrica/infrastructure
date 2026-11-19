@@ -37,16 +37,23 @@ docker compose -f "$ROOT_DIR/docker-compose.yml" build --parallel
 
 # 4. Bootstrap core persistence services (Postgres, Redis)
 echo -e "\n${BLUE}[Step 4/6]${NC} Starting persistence services and verifying health..."
-docker compose -f "$ROOT_DIR/docker-compose.yml" up -d postgres redis
 
-echo -e "Waiting for PostgreSQL and Redis to achieve healthy status..."
-until docker compose -f "$ROOT_DIR/docker-compose.yml" ps postgres --filter "status=running" | grep -q "healthy"; do
-    sleep 2
-done
+if [ -n "${DATABASE_URL:-}" ] && [[ "${DATABASE_URL:-}" != *"localhost"* ]] && [[ "${DATABASE_URL:-}" != *"postgres:5432"* ]]; then
+    echo -e "${GREEN}[INFO]${NC} External managed PostgreSQL detected. Bypassing local PostgreSQL container."
+    docker compose -f "$ROOT_DIR/docker-compose.yml" up -d redis
+else
+    docker compose -f "$ROOT_DIR/docker-compose.yml" up -d postgres redis
+    echo -e "Waiting for PostgreSQL to achieve healthy status..."
+    until docker compose -f "$ROOT_DIR/docker-compose.yml" ps postgres --filter "status=running" | grep -q "healthy"; do
+        sleep 2
+    done
+fi
+
+echo -e "Waiting for Redis to achieve healthy status..."
 until docker compose -f "$ROOT_DIR/docker-compose.yml" ps redis --filter "status=running" | grep -q "healthy"; do
     sleep 2
 done
-echo -e "${GREEN}[OK]${NC} PostgreSQL and Redis are healthy and accepting connections."
+echo -e "${GREEN}[OK]${NC} Persistence services are healthy and accepting connections."
 
 # 5. Start application cluster (Backend, Frontend, Admin-Portal)
 echo -e "\n${BLUE}[Step 5/6]${NC} Launching application cluster and running migrations..."
@@ -64,12 +71,16 @@ until docker compose -f "$ROOT_DIR/docker-compose.yml" ps admin-portal --filter 
 done
 echo -e "${GREEN}[OK]${NC} Core Backend, Frontend Web, and Admin Portal are fully operational."
 
-# 6. Initialize SSL and Edge Reverse Proxy
-echo -e "\n${BLUE}[Step 6/6]${NC} Initializing SSL certificates and ingress routing..."
+# 6. Initialize Traefik Ingress Gateway and Mail Relay
+echo -e "\n${BLUE}[Step 6/6]${NC} Initializing Traefik Ingress Gateway, Maintenance Engine, and Postfix..."
 "$SCRIPT_DIR/init-ssl.sh"
 
-# Start Certbot auto-renewal background worker
-docker compose -f "$ROOT_DIR/docker-compose.yml" up -d certbot
+docker compose -f "$ROOT_DIR/docker-compose.yml" up -d traefik maintenance-page postfix
+
+echo -e "Waiting for Traefik Ingress to achieve healthy status..."
+until docker compose -f "$ROOT_DIR/docker-compose.yml" ps traefik --filter "status=running" | grep -q "healthy"; do
+    sleep 2
+done
 
 echo -e "\n${GREEN}======================================================================${NC}"
 echo -e "${GREEN}     Dexta Africa Infrastructure Deployment Successfully Completed!    ${NC}"

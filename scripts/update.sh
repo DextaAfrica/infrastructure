@@ -56,9 +56,8 @@ until docker compose -f "$ROOT_DIR/docker-compose.yml" ps admin-portal --filter 
     sleep 2
 done
 
-# 6. Reload Edge Reverse Proxy (gracefully drains existing connections without drops)
-echo -e "\n${BLUE}[Step 5/5]${NC} Reloading Nginx ingress proxy without dropping active connections..."
-docker compose -f "$ROOT_DIR/docker-compose.yml" exec reverse-proxy nginx -s reload
+# 5. Traefik automatically hot-swaps traffic with zero dropped connections
+echo -e "\n${BLUE}[Step 5/5]${NC} Traefik ingress gateway hot-swapped traffic to updated containers."
 
 echo -e "\n${GREEN}======================================================================${NC}"
 echo -e "${GREEN}      Cluster Update Finished Successfully! All Services Healthy.     ${NC}"

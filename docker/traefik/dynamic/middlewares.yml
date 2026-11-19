@@ -1,0 +1,77 @@
+# ==============================================================================
+# Dexta Africa Enterprise Traefik v3 Dynamic Middlewares
+# ==============================================================================
+
+http:
+  middlewares:
+    # --------------------------------------------------------------------------
+    # 1. Enterprise Security Headers
+    # --------------------------------------------------------------------------
+    secHeaders:
+      headers:
+        sslRedirect: true
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        frameDeny: false
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          X-Robots-Tag: "index, follow"
+          Server: ""
+
+    adminSecHeaders:
+      headers:
+        sslRedirect: true
+        stsSeconds: 63072000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          Server: ""
+
+    # --------------------------------------------------------------------------
+    # 2. Compression & Performance
+    # --------------------------------------------------------------------------
+    compressAll:
+      compress:
+        minResponseBodyBytes: 256
+
+    # --------------------------------------------------------------------------
+    # 3. Rate Limiting (DDoS & Brute-Force Shield)
+    # --------------------------------------------------------------------------
+    rateLimitGeneral:
+      rateLimit:
+        average: 50
+        burst: 100
+        period: 1s
+
+    rateLimitApi:
+      rateLimit:
+        average: 25
+        burst: 50
+        period: 1s
+
+    rateLimitAuth:
+      rateLimit:
+        average: 5
+        burst: 10
+        period: 1s
+
+    # --------------------------------------------------------------------------
+    # 4. Buffer & Max Upload Size for Media Assets (Admin Portal)
+    # --------------------------------------------------------------------------
+    largeBodyBuffering:
+      buffering:
+        maxRequestBodyBytes: 52428800 # 50MB
+        memRequestBodyBytes: 2097152  # 2MB
+        retryExpression: "IsNetworkError() && Attempts() <= 2"

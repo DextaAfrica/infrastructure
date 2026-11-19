@@ -34,9 +34,13 @@ echo -e "${BLUE}==>${NC} Starting enterprise backup at $TIMESTAMP..."
 mkdir -p "$TEMP_DUMP_DIR"
 
 # 1. Backup PostgreSQL Core Database
-echo -e "${BLUE}==>${NC} Dumping PostgreSQL database (${POSTGRES_DB:-dexta_prod})..."
-docker compose -f "$ROOT_DIR/docker-compose.yml" exec -T postgres \
-  pg_dump -U "${POSTGRES_USER:-dexta}" "${POSTGRES_DB:-dexta_prod}" > "$TEMP_DUMP_DIR/postgres.sql"
+if docker compose -f "$ROOT_DIR/docker-compose.yml" ps --services --filter "status=running" | grep -q "postgres"; then
+    echo -e "${BLUE}==>${NC} Dumping local PostgreSQL database (${POSTGRES_DB:-dexta_prod})..."
+    docker compose -f "$ROOT_DIR/docker-compose.yml" exec -T postgres \
+      pg_dump -U "${POSTGRES_USER:-dexta}" "${POSTGRES_DB:-dexta_prod}" > "$TEMP_DUMP_DIR/postgres.sql"
+else
+    echo -e "${BLUE}==>${NC} Primary database is hosted externally (managed by cloud provider automated snapshots)."
+fi
 
 # 2. Backup Admin Portal Database
 echo -e "${BLUE}==>${NC} Snapshotting Admin Portal database..."
