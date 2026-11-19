@@ -1,0 +1,30 @@
+name: Production Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production_deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    if: github.repository == 'DextaAfrica/infrastructure'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SERVER_HOST }}
+          username: ${{ secrets.PROD_SERVER_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            DEPLOY_PATH="${{ secrets.PROD_DEPLOY_PATH || '/opt/dextaafrica/infrastructure' }}"
+            echo "==> Deploying updates at $DEPLOY_PATH..."
+            cd "$DEPLOY_PATH"
+            make update

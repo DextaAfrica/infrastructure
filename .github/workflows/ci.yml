@@ -1,0 +1,32 @@
+name: Infrastructure CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  validate:
+    name: Validate Docker & Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Mock Environment
+        run: |
+          cp .env.example .env
+          mkdir -p services/frontend services/admin-portal services/backend
+          touch services/frontend/Dockerfile.prod services/admin-portal/Dockerfile services/backend/Dockerfile
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.dev.yml config > /dev/null
+
+      - name: ShellCheck Scripts
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './scripts'
+          severity: warning
