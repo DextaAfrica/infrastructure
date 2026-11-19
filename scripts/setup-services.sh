@@ -38,7 +38,7 @@ prepare_service() {
         fi
     fi
 
-    if [ -d "$target_dir" ] && [ -f "$target_dir/Dockerfile" -o -f "$target_dir/Dockerfile.prod" ]; then
+    if [ -d "$target_dir" ] && { [ -f "$target_dir/Dockerfile" ] || [ -f "$target_dir/Dockerfile.prod" ]; }; then
         echo -e "${GREEN}[FOUND]${NC} Service $service_name already prepared in $target_dir."
     elif [ -d "$sibling_dir" ]; then
         echo -e "${GREEN}[LINK]${NC} Found local repository at $sibling_dir. Linking to $target_dir..."

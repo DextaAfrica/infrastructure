@@ -8,9 +8,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
@@ -25,7 +23,7 @@ echo -e "\n${BLUE}[Step 1/6]${NC} Validating configuration and prerequisites..."
 
 # Load environment
 set -a
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "$ROOT_DIR/.env"
 set +a
 

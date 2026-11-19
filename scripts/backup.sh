@@ -18,7 +18,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 set -a
-# shellcheck disable=SC1090
+# shellcheck disable=SC1090,SC1091
 source "$ENV_FILE"
 set +a
 
@@ -26,7 +26,6 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 TEMP_DUMP_DIR="$BACKUP_DIR/tmp_$TIMESTAMP"
 ARCHIVE_FILE="$BACKUP_DIR/dexta_backup_${TIMESTAMP}.tar.gz"
 
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
