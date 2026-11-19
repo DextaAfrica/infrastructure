@@ -12,6 +12,7 @@ services:
       - "443:443/udp" # HTTP/3 QUIC
     environment:
       - SSL_EMAIL=${SSL_EMAIL:-devops@dextaafrica.com}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${SSL_EMAIL:-devops@dextaafrica.com}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro

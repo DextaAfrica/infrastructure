@@ -27,6 +27,7 @@ postmap /etc/postfix/sasl_passwd
 rm -f /etc/postfix/sasl_passwd # remove cleartext file after hashing
 
 # Configure Postfix parameters in main.cf
+postconf -e "maillog_file = /dev/stdout"
 postconf -e "myhostname = mail.${MAIL_DOMAIN}"
 postconf -e "mydomain = ${MAIL_DOMAIN}"
 postconf -e "myorigin = \$mydomain"
@@ -40,6 +41,7 @@ postconf -e "smtp_sasl_auth_enable = yes"
 postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
 postconf -e "smtp_sasl_security_options = noanonymous"
 postconf -e "smtp_sasl_tls_security_options = noanonymous"
+postconf -e "smtp_sasl_mechanism_filter = plain, login"
 
 # Enforce TLS encryption for all outbound mail
 postconf -e "smtp_tls_security_level = encrypt"

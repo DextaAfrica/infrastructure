@@ -6,6 +6,9 @@ global:
   checkNewVersion: false
   sendAnonymousUsage: false
 
+# Liveness Probe Ping Engine
+ping: {}
+
 # Traefik API and Operational Dashboard
 api:
   dashboard: true
@@ -15,6 +18,13 @@ api:
 entryPoints:
   web:
     address: ":80"
+    forwardedHeaders:
+      insecure: false
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
     http:
       redirections:
         entryPoint:
@@ -24,6 +34,13 @@ entryPoints:
 
   websecure:
     address: ":443"
+    forwardedHeaders:
+      insecure: false
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "10.0.0.0/8"
+        - "172.16.0.0/12"
+        - "192.168.0.0/16"
     http:
       tls:
         certResolver: letsencrypt
@@ -36,7 +53,6 @@ entryPoints:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "${SSL_EMAIL:-devops@dextaafrica.com}"
       storage: "/etc/traefik/acme/acme.json"
       httpChallenge:
         entryPoint: web
