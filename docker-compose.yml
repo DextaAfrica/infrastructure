@@ -66,7 +66,7 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - APP_PORT=8080
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - DATABASE_URL=postgres://${POSTGRES_USER:-dexta}:${POSTGRES_PASSWORD:-dexta_secret_2026}@postgres:5432/${POSTGRES_DB:-dexta_prod}?sslmode=disable
+      - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-dexta}:${POSTGRES_PASSWORD:-dexta_secret_2026}@postgres:5432/${POSTGRES_DB:-dexta_prod}?sslmode=disable}
       - DATABASE_AUTO_MIGRATE=true
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_TOKEN_TTL=${JWT_ACCESS_TOKEN_TTL:-24h}
@@ -84,6 +84,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       redis:
         condition: service_healthy
     networks:

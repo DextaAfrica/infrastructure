@@ -16,10 +16,15 @@ NC='\033[0m'
 echo -e "${BLUE}==>${NC} Validating deployment environment..."
 
 if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}[ERROR]${NC} Missing .env file in $ROOT_DIR!"
-    echo -e "       Copy template: cp .env.example .env"
-    echo -e "       Configure required secrets before running make deploy."
-    exit 1
+    if [ -f "$ROOT_DIR/.env-prod" ]; then
+        echo -e "${BLUE}[INFO]${NC} Found .env-prod, syncing to .env..."
+        cp "$ROOT_DIR/.env-prod" "$ENV_FILE"
+    else
+        echo -e "${RED}[ERROR]${NC} Missing .env file in $ROOT_DIR!"
+        echo -e "       Copy template: cp .env.example .env"
+        echo -e "       Configure required secrets before running make deploy."
+        exit 1
+    fi
 fi
 
 # Load variables
@@ -44,7 +49,11 @@ validate_required() {
 }
 
 validate_required "DOMAIN"
-validate_required "POSTGRES_PASSWORD"
+if [ -n "${DATABASE_URL:-}" ] && [[ "${DATABASE_URL:-}" != *"localhost"* ]] && [[ "${DATABASE_URL:-}" != *"postgres:5432"* ]]; then
+    validate_required "DATABASE_URL"
+else
+    validate_required "POSTGRES_PASSWORD"
+fi
 validate_required "REDIS_PASSWORD"
 validate_required "JWT_SECRET"
 validate_required "FRONTEND_REVALIDATE_SECRET"
