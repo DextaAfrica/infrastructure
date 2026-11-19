@@ -33,9 +33,16 @@ prepare_service() {
             sibling_dir="$PARENT_DIR/Admin-portal"
         elif [ "$service_name" = "frontend" ] && [ -d "$PARENT_DIR/Frontend" ]; then
             sibling_dir="$PARENT_DIR/Frontend"
+        elif [ "$service_name" = "backend" ] && [ -d "$PARENT_DIR/Backend/Backend" ]; then
+            sibling_dir="$PARENT_DIR/Backend/Backend"
         elif [ "$service_name" = "backend" ] && [ -d "$PARENT_DIR/Backend" ]; then
             sibling_dir="$PARENT_DIR/Backend"
         fi
+    fi
+
+    # If backend has a nested Backend folder containing the Dockerfile, link directly to it
+    if [ "$service_name" = "backend" ] && [ -d "$sibling_dir/Backend" ] && [ -f "$sibling_dir/Backend/Dockerfile" ]; then
+        sibling_dir="$sibling_dir/Backend"
     fi
 
     if [ -d "$target_dir" ] && { [ -f "$target_dir/Dockerfile" ] || [ -f "$target_dir/Dockerfile.prod" ]; }; then
