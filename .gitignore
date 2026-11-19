@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.*.local
+*.log
+docker/nginx/ssl/*
+!docker/nginx/ssl/.gitkeep
+docker/nginx/maintenance/active
+backups/db/*
+!backups/db/.gitkeep
+data/postgres/*
+!data/postgres/.gitkeep
+data/admin/*
+!data/admin/.gitkeep
+services/*
+!services/.gitkeep
+.DS_Store

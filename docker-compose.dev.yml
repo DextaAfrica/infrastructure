@@ -1,0 +1,134 @@
+# ==============================================================================
+# Dexta Africa Local Multi-Service Development Compose
+# Runs Backend, Frontend, Admin-Portal, Postgres, Redis, and Mailpit locally
+# ==============================================================================
+
+services:
+  backend:
+    build:
+      context: ${BACKEND_PATH:-../Backend}
+      dockerfile: ${BACKEND_DEV_DOCKERFILE:-Dockerfile.dev}
+    container_name: dexta_backend_dev
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=development
+      - APP_PORT=8080
+      - LOG_LEVEL=debug
+      - DATABASE_URL=postgres://dexta:dexta_dev_password@postgres:5432/dexta_dev?sslmode=disable
+      - DATABASE_AUTO_MIGRATE=true
+      - JWT_SECRET=dev-super-insecure-secret-key-32-chars-long
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://admin.localhost:3002,http://ops.localhost:3002
+      - FRONTEND_REVALIDATE_URL=http://frontend:3000/api/revalidate
+      - FRONTEND_REVALIDATE_SECRET=dev-revalidate-secret
+    volumes:
+      - ${BACKEND_PATH:-../Backend}:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dexta_dev_net
+
+  frontend:
+    build:
+      context: ${FRONTEND_PATH:-../Frontend}
+      dockerfile: Dockerfile.dev
+    container_name: dexta_frontend_dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - BACKEND_API_URL=http://backend:8080
+      - NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8080
+      - CONTENT_REVALIDATION_SECRET=dev-revalidate-secret
+    volumes:
+      - ${FRONTEND_PATH:-../Frontend}:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - dexta_dev_net
+
+  admin-portal:
+    build:
+      context: ${ADMIN_PORTAL_PATH:-../Admin-portal}
+      dockerfile: Dockerfile.dev
+    container_name: dexta_admin_dev
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=file:/app/prisma/admin_portal.db
+      - APP_SECRET=dev_secret_key_64_chars_long_for_signing_sessions_1234567890abcdef
+      - NEXT_PUBLIC_BASE_DOMAIN=localhost
+      - NEXT_PUBLIC_OPS_DOMAIN=ops.localhost:3002
+      - NEXT_PUBLIC_ADMIN_DOMAIN=admin.localhost:3002
+      - BACKEND_API_URL=http://backend:8080
+      - BACKEND_JWT_SECRET=dev-super-insecure-secret-key-32-chars-long
+      - INITIAL_ADMIN_EMAIL=admin@dextaafrica.com
+      - INITIAL_ADMIN_PASSWORD=AdminPassword2026!
+      - ADMIN_REGISTRATION_PASSCODE=DEXTA-2026
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+    volumes:
+      - ${ADMIN_PORTAL_PATH:-../Admin-portal}:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+      - mailpit
+    networks:
+      - dexta_dev_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: dexta_postgres_dev
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=dexta_dev
+      - POSTGRES_USER=dexta
+      - POSTGRES_PASSWORD=dexta_dev_password
+    volumes:
+      - dexta_pg_dev_data:/var/lib/postgresql/data
+    networks:
+      - dexta_dev_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dexta -d dexta_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: dexta_redis_dev
+    ports:
+      - "6379:6379"
+    networks:
+      - dexta_dev_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: dexta_mailpit_dev
+    ports:
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP Port
+    networks:
+      - dexta_dev_net
+
+volumes:
+  dexta_pg_dev_data:
+
+networks:
+  dexta_dev_net:
+    driver: bridge
