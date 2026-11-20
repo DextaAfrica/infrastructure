@@ -42,8 +42,20 @@ deploy: ## Full production cluster deployment (build, migrate, SSL, start)
 	@./scripts/deploy.sh
 
 .PHONY: update
-update: ## Rolling zero/minimal-downtime update (pull git, build, migrate, reload)
-	@./scripts/update.sh
+update: ## Rolling zero/minimal-downtime update (pull git, build, reload). Usage: make update or make update service=admin-portal
+	@./scripts/update.sh $(if $(service),$(service),all)
+
+.PHONY: update-admin
+update-admin: ## Fast single-service rolling update for Admin Portal (pull git, build, hot-swap)
+	@./scripts/update.sh admin-portal
+
+.PHONY: update-frontend
+update-frontend: ## Fast single-service rolling update for Frontend Web (pull git, build, hot-swap)
+	@./scripts/update.sh frontend
+
+.PHONY: update-backend
+update-backend: ## Fast single-service rolling update for Go Backend (pull git, build, hot-swap)
+	@./scripts/update.sh backend
 
 .PHONY: start
 start: ## Start all production containers in the background and verify health
