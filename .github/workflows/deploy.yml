@@ -1,8 +1,16 @@
-name: Production Continuous Deployment
+name: Production Continuous Deployment (CD)
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build & Push Production OCI Images to GHCR"]
+    types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Environment to Deploy"
+        required: true
+        default: "prod"
 
 concurrency:
   group: production_deploy
@@ -10,9 +18,9 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to Production Server
+    name: Deploy Image Updates to Production Cluster
     runs-on: ubuntu-latest
-    if: github.repository == 'DextaAfrica/infrastructure'
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -23,8 +31,8 @@ jobs:
           port: ${{ secrets['PROD_SSH_PORT'] || 22 }}
           script_stop: true
           script: |
-            set -e
-            DEPLOY_PATH="${{ secrets['PROD_DEPLOY_PATH'] || '/opt/dextaafrica/infrastructure' }}"
-            echo "==> Deploying updates at $DEPLOY_PATH..."
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets['PROD_DEPLOY_PATH'] || '/home/server/apps/dextaafrica/infra/prod' }}"
+            echo "==> Initiating production deployment at $DEPLOY_PATH..."
             cd "$DEPLOY_PATH"
-            make update
+            make deploy

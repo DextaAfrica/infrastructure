@@ -1,0 +1,30 @@
+# ==============================================================================
+# Dexta Africa Enterprise Maintenance Page Overlay
+# ==============================================================================
+# Used during deployments, database schema migrations, and emergency maintenance.
+# Serves an executive, branded HTTP 503 response with Retry-After headers.
+# ==============================================================================
+
+services:
+  maintenance:
+    image: ${MAINTENANCE_IMAGE:-dexta-maintenance:local}
+    build:
+      context: ./maintenance
+      dockerfile: Dockerfile
+    container_name: dexta_maintenance
+    restart: "no"
+    networks:
+      - dexta_prod_network
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 3s
+      timeout: 2s
+      retries: 3
+      start_period: 2s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"

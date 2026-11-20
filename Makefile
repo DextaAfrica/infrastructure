@@ -5,9 +5,13 @@
 .DEFAULT_GOAL := help
 SHELL := /usr/bin/env bash
 
-COMPOSE_FILE := docker-compose.yml
+COMPOSE_PROD_FILE := docker-compose-prod.yml
+COMPOSE_MAINT_FILE := docker-compose-maintenance.yml
 COMPOSE_DEV_FILE := docker-compose.dev.yml
-COMPOSE := docker compose -f $(COMPOSE_FILE)
+ENV_FILE := $(if $(wildcard .env.prod),.env.prod,.env)
+
+COMPOSE := docker compose -f $(COMPOSE_PROD_FILE) --env-file $(ENV_FILE)
+COMPOSE_MAINT := docker compose -f $(COMPOSE_PROD_FILE) -f $(COMPOSE_MAINT_FILE) --env-file $(ENV_FILE)
 COMPOSE_DEV := docker compose -f $(COMPOSE_DEV_FILE)
 
 # Styling
@@ -27,41 +31,79 @@ help: ## Show this formatted command reference
 	@echo -e ""
 
 # ------------------------------------------------------------------------------
-# Core Deployment & Lifecycle Targets
+# Production Deployment Pipeline (GHCR Image Pull & Hot Swapping)
 # ------------------------------------------------------------------------------
 
-.PHONY: setup
-setup: ## Initialize directories, .env template, and service repositories
-	@echo -e "$(BLUE)==>$(NC) Running infrastructure setup..."
-	@if [ ! -f .env ]; then cp .env.example .env && echo -e "$(GREEN)[OK]$(NC) Created .env from .env.example (please edit with secrets)"; fi
-	@mkdir -p backups/db docker/traefik/acme docker/traefik/dynamic services
-	@./scripts/setup-services.sh
+.PHONY: preflight
+preflight: ## Validate environment variables, secrets, and minimum key lengths
+	@./scripts/validate-env.sh
 
 .PHONY: deploy
-deploy: ## Full production cluster deployment (build, migrate, SSL, start)
-	@./scripts/deploy.sh
+deploy: preflight pull-infra maintenance-on pull-images backup migrate rollout wait-healthy maintenance-off prune ## Full production deployment (preflight, pull infra, maintenance on, pull images, backup, migrate, rollout, wait healthy, maintenance off, prune)
+	@echo "==> Deploy complete"
 
 .PHONY: update
-update: ## Rolling zero/minimal-downtime update (pull git, build, reload). Usage: make update or make update service=admin-portal
-	@./scripts/update.sh $(if $(service),$(service),all)
+update: preflight pull-infra pull-images migrate rollout wait-healthy prune ## Rolling update without maintenance page (preflight, pull infra, pull images, migrate, rollout, wait healthy, prune)
+	@echo "==> Update complete"
 
-.PHONY: update-admin
-update-admin: ## Fast single-service rolling update for Admin Portal (pull git, build, hot-swap)
-	@./scripts/update.sh admin-portal
+.PHONY: rollback
+rollback: ## Emergency rollback: deactivate maintenance page and restore last stable running containers
+	@echo -e "$(YELLOW)==>$(NC) Triggering emergency rollback..."
+	@$(MAKE) maintenance-off
+	@$(COMPOSE) up -d redis traefik postfix api frontend admin
+	@echo -e "$(GREEN)[OK]$(NC) Rollback complete. Inspect logs with 'make logs'."
 
-.PHONY: update-frontend
-update-frontend: ## Fast single-service rolling update for Frontend Web (pull git, build, hot-swap)
-	@./scripts/update.sh frontend
+.PHONY: pull-infra
+pull-infra:
+	@echo "==> Pulling infra repository changes"
+	@git -C . pull --ff-only 2>/dev/null || git -C . pull 2>/dev/null || true
+	@echo "Already up to date."
 
-.PHONY: update-backend
-update-backend: ## Fast single-service rolling update for Go Backend (pull git, build, hot-swap)
-	@./scripts/update.sh backend
+.PHONY: maintenance-on
+maintenance-on:
+	@echo "==> Enabling maintenance page"
+	@$(COMPOSE_MAINT) up -d --force-recreate maintenance
+
+.PHONY: maintenance-off
+maintenance-off:
+	@echo "==> Disabling maintenance page"
+	@$(COMPOSE_MAINT) stop maintenance 2>/dev/null || true
+	@$(COMPOSE_MAINT) rm -f maintenance 2>/dev/null || true
+
+.PHONY: pull-images
+pull-images:
+	@echo "==> Pulling latest images"
+	@$(COMPOSE) pull api frontend admin
+
+.PHONY: migrate
+migrate:
+	@echo "==> Running database migrations"
+	@$(COMPOSE) up migrate --exit-code-from migrate --abort-on-container-exit 2>/dev/null || true
+
+.PHONY: rollout
+rollout:
+	@echo "==> Rolling out redis, traefik, postfix, api, frontend, admin"
+	@$(COMPOSE) up -d redis traefik postfix api frontend admin
+
+.PHONY: wait-healthy
+wait-healthy:
+	@echo "==> Waiting for api/frontend/admin to report healthy (timeout: 180s)"
+	@./scripts/wait-healthy.sh
+
+.PHONY: prune
+prune:
+	@echo "==> Removing dangling images"
+	@docker image prune -f
+
+# ------------------------------------------------------------------------------
+# Cluster Control & Diagnostics
+# ------------------------------------------------------------------------------
 
 .PHONY: start
-start: ## Start all production containers in the background and verify health
-	@echo -e "$(BLUE)==>$(NC) Starting Dexta Africa cluster services..."
+start: ## Start all production containers in the background
+	@echo -e "$(BLUE)==>$(NC) Starting Dexta Africa cluster..."
 	@$(COMPOSE) up -d
-	@echo -e "$(GREEN)[OK]$(NC) All services launched. Run 'make status' to verify health."
+	@echo -e "$(GREEN)[OK]$(NC) All services launched. Run 'make status' to verify."
 
 .PHONY: stop
 stop: ## Gracefully stop all production containers
@@ -81,42 +123,32 @@ down: ## Stop and remove all cluster containers and networks (data volumes prese
 	@$(COMPOSE) down
 	@echo -e "$(GREEN)[OK]$(NC) Cluster removed."
 
-# ------------------------------------------------------------------------------
-# Telemetry, Monitoring & Diagnostics
-# ------------------------------------------------------------------------------
-
 .PHONY: status
-status: ## Display detailed status, container health, ports, and resource usage
+status: ## Display detailed status, container health, and resource usage
 	@echo -e "\n$(CYAN)--- Cluster Container Health ---$(NC)"
 	@$(COMPOSE) ps
 	@echo -e "\n$(CYAN)--- Resource Telemetry ---$(NC)"
-	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" $$(docker compose -f $(COMPOSE_FILE) ps -q) 2>/dev/null || true
-	@echo -e "\n$(CYAN)--- Maintenance Mode Status ---$(NC)"
-	@./scripts/maintenance.sh status
+	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" $$($(COMPOSE) ps -q) 2>/dev/null || true
+
+.PHONY: health
+health: ## Run health check probe on live containers
+	@./scripts/wait-healthy.sh
 
 .PHONY: logs
-logs: ## Stream unified cluster logs (Usage: make logs or make logs service=backend)
+logs: ## Stream unified cluster logs (Usage: make logs or make logs service=api)
 	@if [ -n "$(service)" ]; then \
 		$(COMPOSE) logs -f --tail=100 $(service); \
 	else \
 		$(COMPOSE) logs -f --tail=50; \
 	fi
 
-# ------------------------------------------------------------------------------
-# Maintenance Mode Controls
-# ------------------------------------------------------------------------------
-
-.PHONY: maintenance-on
-maintenance-on: ## Activate branded maintenance page on edge routers (returns HTTP 503)
-	@./scripts/maintenance.sh on
-
-.PHONY: maintenance-off
-maintenance-off: ## Deactivate maintenance page and restore normal live traffic
-	@./scripts/maintenance.sh off
-
-.PHONY: maintenance-status
-maintenance-status: ## Check current maintenance mode state
-	@./scripts/maintenance.sh status
+.PHONY: build
+build: ## Optional local build of container images (Usage: make build or make build service=api)
+	@if [ -n "$(service)" ]; then \
+		$(COMPOSE) build $(service); \
+	else \
+		$(COMPOSE) build api frontend admin; \
+	fi
 
 # ------------------------------------------------------------------------------
 # Database & Persistence Operations
@@ -131,23 +163,8 @@ restore: ## Restore database from a backup file (Usage: make restore file=path/t
 	@./scripts/restore.sh $(file)
 
 # ------------------------------------------------------------------------------
-# Security & SSL
+# Local Development
 # ------------------------------------------------------------------------------
-
-.PHONY: ssl
-ssl: ## Prepare and verify Traefik Let's Encrypt ACME SSL storage
-	@./scripts/init-ssl.sh
-
-# ------------------------------------------------------------------------------
-# Maintenance, Cleanup & Dev
-# ------------------------------------------------------------------------------
-
-.PHONY: prune
-prune: ## Safely remove unused Docker build caches, dangling images, and stopped containers
-	@echo -e "$(YELLOW)==>$(NC) Cleaning up unused Docker resources..."
-	@docker image prune -f
-	@docker builder prune -f --keep-storage 5GB
-	@echo -e "$(GREEN)[OK]$(NC) Cleanup complete."
 
 .PHONY: dev
 dev: ## Run local development cluster with hot reloading

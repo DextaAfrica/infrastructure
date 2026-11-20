@@ -1,0 +1,175 @@
+# ==============================================================================
+# Dexta Africa Enterprise Production Cluster (OCI Image Pull Architecture)
+# ==============================================================================
+# All images are pre-built, vulnerability-scanned, and pulled from GitHub Container
+# Registry (ghcr.io). The host server NEVER compiles code; it simply pulls verified,
+# immutable artifact digests for maximum speed, security, and reproducibility.
+# ==============================================================================
+
+networks:
+  dexta_prod_network:
+    name: dexta_prod_network
+    driver: bridge
+
+volumes:
+  redis_data:
+    name: dexta_prod_redis_data
+  admin_data:
+    name: dexta_prod_admin_data
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Distributed Cache & Session Store
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: dexta_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-dexta_redis_secret_2026}"]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-dexta_redis_secret_2026}
+    volumes:
+      - redis_data:/data
+    networks:
+      - dexta_prod_network
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-dexta_redis_secret_2026}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
+  # 2. Database Migration Runner (One-Shot Ephemeral Job)
+  # ----------------------------------------------------------------------------
+  migrate:
+    image: ${API_IMAGE:-ghcr.io/dextaafrica/dexta-api:main}
+    container_name: dexta_migrate
+    restart: "no"
+    command: ["/app/api"]
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - RUN_AUTOMIGRATE=true
+      - DATABASE_AUTO_MIGRATE=true
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dexta_redis_secret_2026}@redis:6379/0
+    networks:
+      - dexta_prod_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+  # ----------------------------------------------------------------------------
+  # 3. Core Enterprise API Gateway (Go / Chi / Distroless)
+  # ----------------------------------------------------------------------------
+  api:
+    image: ${API_IMAGE:-ghcr.io/dextaafrica/dexta-api:main}
+    container_name: dexta_api
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-dexta_redis_secret_2026}@redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - RUN_AUTOMIGRATE=false
+      - DATABASE_AUTO_MIGRATE=false
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://dextaafrica.com,https://admin.dextaafrica.com,https://ops.dextaafrica.com}
+    networks:
+      - dexta_prod_network
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ----------------------------------------------------------------------------
+  # 4. Public Web Frontend Experience (Next.js Standalone)
+  # ----------------------------------------------------------------------------
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/dextaafrica/dexta-frontend:main}
+    container_name: dexta_frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_APP_URL=${FRONTEND_URL:-https://dextaafrica.com}
+      - NEXT_PUBLIC_BACKEND_API_URL=${API_URL:-https://api.dextaafrica.com}
+      - BACKEND_INTERNAL_URL=http://api:8080
+    networks:
+      - dexta_prod_network
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+        max-file: "5"
+
+  # ----------------------------------------------------------------------------
+  # 5. Systems IT & Operations Admin Portal (Next.js Multi-Tenant)
+  # ----------------------------------------------------------------------------
+  admin:
+    image: ${ADMIN_IMAGE:-ghcr.io/dextaafrica/dexta-admin:main}
+    container_name: dexta_admin
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${ADMIN_DATABASE_URL:-file:/app/prisma/admin_portal.db}
+      - APP_SECRET=${ADMIN_APP_SECRET}
+      - BACKEND_API_URL=http://api:8080
+      - NEXT_PUBLIC_API_URL=${API_URL:-https://api.dextaafrica.com}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.dextaafrica.com}
+    networks:
+      - dexta_prod_network
+    volumes:
+      - admin_data:/app/prisma
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "30m"
+        max-file: "5"
