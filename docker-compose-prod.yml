@@ -328,11 +328,12 @@ services:
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
     container_name: dexta_migrate
     restart: "no"
-    command: ["/app/api"]
+    command: ["/app/api", "migrate"]
     environment:
       - APP_ENV=production
       - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-dexta}:${POSTGRES_PASSWORD:-dexta_secret_2026}@postgres:5432/${POSTGRES_DB:-dexta_prod}?sslmode=disable}
       - DATABASE_AUTO_MIGRATE=true
+      - MIGRATE_ONLY=true
     networks:
       - dexta_network
 

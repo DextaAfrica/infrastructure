@@ -50,7 +50,7 @@ services:
   # 2. Database Migration Runner (One-Shot Ephemeral Job)
   # ----------------------------------------------------------------------------
   migrate:
-    image: ${API_IMAGE:-ghcr.io/dextaafrica/dexta-api:main}
+    image: ${API_IMAGE:-ghcr.io/dextaafrica/backend:main}
     container_name: dexta_migrate
     restart: "no"
     command: ["/app/api"]
@@ -75,7 +75,7 @@ services:
   # 3. Core Enterprise API Gateway (Go / Chi / Distroless)
   # ----------------------------------------------------------------------------
   api:
-    image: ${API_IMAGE:-ghcr.io/dextaafrica/dexta-api:main}
+    image: ${API_IMAGE:-ghcr.io/dextaafrica/backend:main}
     container_name: dexta_api
     restart: unless-stopped
     environment:
@@ -110,7 +110,7 @@ services:
   # 4. Public Web Frontend Experience (Next.js Standalone)
   # ----------------------------------------------------------------------------
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/dextaafrica/dexta-frontend:main}
+    image: ${FRONTEND_IMAGE:-ghcr.io/dextaafrica/frontend:main}
     container_name: dexta_frontend
     restart: unless-stopped
     environment:
@@ -142,7 +142,7 @@ services:
   # 5. Systems IT & Operations Admin Portal (Next.js Multi-Tenant)
   # ----------------------------------------------------------------------------
   admin:
-    image: ${ADMIN_IMAGE:-ghcr.io/dextaafrica/dexta-admin:main}
+    image: ${ADMIN_IMAGE:-ghcr.io/dextaafrica/admin-portal:main}
     container_name: dexta_admin
     restart: unless-stopped
     environment:

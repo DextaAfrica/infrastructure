@@ -68,6 +68,16 @@ pull-images: ## Pull latest verified OCI images from GitHub Container Registry
 	@echo -e "$(BLUE)==> Pulling latest images$(NC)"
 	@$(COMPOSE_PROD) pull api frontend admin
 
+.PHONY: build-images
+build-images: ## Build all production images locally with multi-stage BuildKit caching
+	@echo -e "$(BLUE)==> Building all production images locally$(NC)"
+	@../scripts/build-images.sh main false
+
+.PHONY: push-images
+push-images: ## Build and push all production images to GitHub Container Registry (GHCR)
+	@echo -e "$(BLUE)==> Building and pushing production images to GHCR$(NC)"
+	@../scripts/build-images.sh main --push
+
 .PHONY: run-migrations
 run-migrations: ## Execute one-shot database schema migrations
 	@echo -e "$(BLUE)==> Running database migrations$(NC)"
