@@ -96,7 +96,8 @@ fi
 # 4. Pre-build fresh images (containers keep serving live traffic during build)
 echo -e "\n${BLUE}[Step 3/5]${NC} Pre-building updated images in background..."
 if [ "$TARGET_SERVICE" = "all" ]; then
-    docker compose -f "$ROOT_DIR/docker-compose.yml" build --parallel
+    echo -e "Building application services (backend, frontend, admin-portal)..."
+    docker compose -f "$ROOT_DIR/docker-compose.yml" build --parallel backend frontend admin-portal
 else
     docker compose -f "$ROOT_DIR/docker-compose.yml" build "$TARGET_SERVICE"
 fi

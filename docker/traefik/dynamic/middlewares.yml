@@ -48,24 +48,34 @@ http:
 
     # --------------------------------------------------------------------------
     # 3. Rate Limiting (DDoS & Brute-Force Shield)
+    # Uses ipStrategy (depth: 1) to inspect real client IP from X-Forwarded-For
     # --------------------------------------------------------------------------
     rateLimitGeneral:
       rateLimit:
         average: 50
         burst: 100
         period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
     rateLimitApi:
       rateLimit:
         average: 25
         burst: 50
         period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
     rateLimitAuth:
       rateLimit:
         average: 5
         burst: 10
         period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
 
     # --------------------------------------------------------------------------
     # 4. Buffer & Max Upload Size for Media Assets (Admin Portal)

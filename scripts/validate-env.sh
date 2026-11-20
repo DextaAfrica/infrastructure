@@ -37,6 +37,7 @@ ERRORS=0
 
 validate_required() {
     local var_name="$1"
+    local min_length="${2:-0}"
     local value="${!var_name:-}"
 
     if [ -z "$value" ]; then
@@ -45,6 +46,9 @@ validate_required() {
     elif [[ "$value" == *"replace_with"* ]] || [[ "$value" == *"change-me"* ]]; then
         echo -e "${RED}[INSECURE]${NC} Variable ${var_name} contains placeholder '${value}'! Must be set to a real secure production secret."
         ERRORS=$((ERRORS + 1))
+    elif [ "$min_length" -gt 0 ] && [ "${#value}" -lt "$min_length" ]; then
+        echo -e "${RED}[WEAK]${NC} Variable ${var_name} length (${#value}) is below minimum ${min_length} chars required for cryptographic security."
+        ERRORS=$((ERRORS + 1))
     fi
 }
 
@@ -52,12 +56,12 @@ validate_required "DOMAIN"
 if [ -n "${DATABASE_URL:-}" ] && [[ "${DATABASE_URL:-}" != *"localhost"* ]] && [[ "${DATABASE_URL:-}" != *"postgres:5432"* ]]; then
     validate_required "DATABASE_URL"
 else
-    validate_required "POSTGRES_PASSWORD"
+    validate_required "POSTGRES_PASSWORD" 16
 fi
-validate_required "REDIS_PASSWORD"
-validate_required "JWT_SECRET"
-validate_required "FRONTEND_REVALIDATE_SECRET"
-validate_required "ADMIN_APP_SECRET"
+validate_required "REDIS_PASSWORD" 16
+validate_required "JWT_SECRET" 32
+validate_required "FRONTEND_REVALIDATE_SECRET" 16
+validate_required "ADMIN_APP_SECRET" 32
 
 if [ $ERRORS -gt 0 ]; then
     echo -e "\n${RED}[FAILED]${NC} Environment validation failed with ${ERRORS} error(s)."
@@ -65,4 +69,4 @@ if [ $ERRORS -gt 0 ]; then
     exit 1
 fi
 
-echo -e "${GREEN}[OK]${NC} Environment validation successful. All critical keys are present and configured."
+echo -e "${GREEN}[OK]${NC} Environment validation successful. All critical keys and rate limits are configured."
