@@ -4,9 +4,8 @@
 .env.local
 .env.*.local
 *.log
-docker/nginx/ssl/*
-!docker/nginx/ssl/.gitkeep
-docker/nginx/maintenance/active
+docker/traefik/acme/*
+!docker/traefik/acme/.gitkeep
 backups/db/*
 !backups/db/.gitkeep
 data/postgres/*

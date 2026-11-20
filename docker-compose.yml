@@ -20,6 +20,19 @@ services:
       - ./docker/traefik/acme:/etc/traefik/acme
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 15s
@@ -38,6 +51,19 @@ services:
     restart: unless-stopped
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.maintenance-service.loadbalancer.server.port=80"
@@ -62,6 +88,19 @@ services:
       - postfix_spool:/var/spool/postfix
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "postfix status || exit 1"]
       interval: 20s
@@ -109,15 +148,36 @@ services:
         condition: service_healthy
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "traefik.enable=true"
-      # Subdomain API routing: api.dextaafrica.com
+      # Strict Auth Rate Limiter Router (5 req/sec, burst 10)
+      - "traefik.http.routers.backend-auth.rule=Host(`${API_DOMAIN:-api.dextaafrica.com}`) && (PathPrefix(`/api/v1/admin/login`) || PathPrefix(`/api/v1/auth`))"
+      - "traefik.http.routers.backend-auth.priority=100"
+      - "traefik.http.routers.backend-auth.entrypoints=websecure"
+      - "traefik.http.routers.backend-auth.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-auth.middlewares=secHeaders@file,rateLimitAuth@file"
+      # General Subdomain API routing: api.dextaafrica.com (25 req/sec)
       - "traefik.http.routers.backend-subdomain.rule=Host(`${API_DOMAIN:-api.dextaafrica.com}`)"
+      - "traefik.http.routers.backend-subdomain.priority=50"
       - "traefik.http.routers.backend-subdomain.entrypoints=websecure"
       - "traefik.http.routers.backend-subdomain.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend-subdomain.middlewares=secHeaders@file,compressAll@file,rateLimitApi@file"
       # Path routing: dextaafrica.com/api/
       - "traefik.http.routers.backend-path.rule=(Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-path.priority=50"
       - "traefik.http.routers.backend-path.entrypoints=websecure"
       - "traefik.http.routers.backend-path.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend-path.middlewares=secHeaders@file,compressAll@file,rateLimitApi@file"
@@ -159,6 +219,19 @@ services:
         condition: service_healthy
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`)"
@@ -198,6 +271,7 @@ services:
       - NEXT_PUBLIC_APP_URL=https://${ADMIN_DOMAIN:-admin.dextaafrica.com}
       - BACKEND_API_URL=http://backend:8080
       - BACKEND_JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
       - INITIAL_ADMIN_EMAIL=${ADMIN_BOOTSTRAP_EMAIL}
       - INITIAL_ADMIN_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
       - ADMIN_REGISTRATION_PASSCODE=${ADMIN_REGISTRATION_PASSCODE}
@@ -223,12 +297,33 @@ services:
         condition: service_healthy
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "traefik.enable=true"
+      # Strict Auth Rate Limiter Router (5 req/sec, burst 10) for Login and MFA
+      - "traefik.http.routers.admin-auth.rule=(Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`)) && (PathPrefix(`/api/auth`) || PathPrefix(`/api/it/mfa`) || PathPrefix(`/login`))"
+      - "traefik.http.routers.admin-auth.priority=100"
+      - "traefik.http.routers.admin-auth.entrypoints=websecure"
+      - "traefik.http.routers.admin-auth.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.admin-auth.middlewares=adminSecHeaders@file,rateLimitAuth@file,largeBodyBuffering@file"
+      # General Admin Portal Router (50 req/sec)
       - "traefik.http.routers.admin.rule=Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`)"
+      - "traefik.http.routers.admin.priority=50"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.admin.middlewares=adminSecHeaders@file,compressAll@file,largeBodyBuffering@file"
+      - "traefik.http.routers.admin.middlewares=adminSecHeaders@file,compressAll@file,rateLimitGeneral@file,largeBodyBuffering@file"
       - "traefik.http.services.admin-portal.loadbalancer.server.port=3000"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/api/health || exit 1"]
@@ -253,6 +348,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2048M
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dexta} -d ${POSTGRES_DB:-dexta_prod}"]
       interval: 10s
@@ -272,6 +380,19 @@ services:
       - redis_data:/data
     networks:
       - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-dexta_redis_secret_2026}", "ping"]
       interval: 10s
