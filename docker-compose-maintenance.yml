@@ -1,0 +1,30 @@
+# ==============================================================================
+# Dexta Africa Enterprise Maintenance Page Overlay
+# Used during deployments: docker compose -f docker-compose-prod.yml -f docker-compose-maintenance.yml --env-file .env.prod up -d --force-recreate maintenance
+# ==============================================================================
+
+services:
+  maintenance:
+    image: nginx:alpine
+    container_name: dexta_maintenance
+    restart: "no"
+    volumes:
+      - ./prod/maintenance:/usr/share/nginx/html:ro
+    networks:
+      - dexta_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+    labels:
+      - "traefik.enable=true"
+      # Top Priority Router (1000): Intercepts all traffic while maintenance is active
+      - "traefik.http.routers.maintenance.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`) || Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`) || Host(`${API_DOMAIN:-api.dextaafrica.com}`)"
+      - "traefik.http.routers.maintenance.priority=1000"
+      - "traefik.http.routers.maintenance.entrypoints=websecure"
+      - "traefik.http.routers.maintenance.tls.certresolver=letsencrypt"
+      - "traefik.http.services.maintenance.loadbalancer.server.port=80"
