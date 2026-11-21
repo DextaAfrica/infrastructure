@@ -15,16 +15,21 @@ NC='\033[0m'
 
 echo -e "${BLUE}==>${NC} Validating deployment environment..."
 
-if [ ! -f "$ENV_FILE" ]; then
-    if [ -f "$ROOT_DIR/.env-prod" ]; then
-        echo -e "${BLUE}[INFO]${NC} Found .env-prod, syncing to .env..."
-        cp "$ROOT_DIR/.env-prod" "$ENV_FILE"
-    else
-        echo -e "${RED}[ERROR]${NC} Missing .env file in $ROOT_DIR!"
-        echo -e "       Copy template: cp .env.example .env"
-        echo -e "       Configure required secrets before running make deploy."
-        exit 1
-    fi
+if [ -f "$ROOT_DIR/.env.prod" ]; then
+    ENV_FILE="$ROOT_DIR/.env.prod"
+    [ ! -f "$ROOT_DIR/.env" ] && cp "$ROOT_DIR/.env.prod" "$ROOT_DIR/.env"
+elif [ -f "$ROOT_DIR/.env-prod" ]; then
+    ENV_FILE="$ROOT_DIR/.env-prod"
+    [ ! -f "$ROOT_DIR/.env" ] && cp "$ROOT_DIR/.env-prod" "$ROOT_DIR/.env"
+    [ ! -f "$ROOT_DIR/.env.prod" ] && cp "$ROOT_DIR/.env-prod" "$ROOT_DIR/.env.prod"
+elif [ -f "$ROOT_DIR/.env" ]; then
+    ENV_FILE="$ROOT_DIR/.env"
+    [ ! -f "$ROOT_DIR/.env.prod" ] && cp "$ROOT_DIR/.env" "$ROOT_DIR/.env.prod"
+else
+    echo -e "${RED}[ERROR]${NC} Missing environment file (.env.prod or .env) in $ROOT_DIR!"
+    echo -e "       Create from template: cp .env.example .env.prod"
+    echo -e "       Configure required secrets before running make deploy."
+    exit 1
 fi
 
 # Load variables
