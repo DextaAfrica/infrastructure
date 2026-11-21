@@ -1,52 +1,12 @@
 # ==============================================================================
 # Dexta Africa Enterprise Production Stack (GHCR Container Deployment)
+# Integrated with host shared_traefik on external network: traefik-public
 # Used with: docker compose -f docker-compose-prod.yml --env-file .env.prod
 # ==============================================================================
 
 services:
   # ============================================================================
-  # 1. Edge Ingress Gateway (Traefik v3)
-  # ============================================================================
-  traefik:
-    image: traefik:v3.2
-    container_name: dexta_traefik
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3 QUIC
-    environment:
-      - SSL_EMAIL=${SSL_EMAIL:-devops@dextaafrica.com}
-      - TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL=${SSL_EMAIL:-devops@dextaafrica.com}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./docker/traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./docker/traefik/acme:/etc/traefik/acme
-    networks:
-      - dexta_network
-    deploy:
-      resources:
-        limits:
-          cpus: "2.0"
-          memory: 1024M
-        reservations:
-          cpus: "0.25"
-          memory: 128M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
-  # ============================================================================
-  # 2. Postfix Mail Relay (Authenticated via Brevo / Sendinblue)
+  # 1. Postfix Mail Relay (Authenticated via Brevo / Sendinblue)
   # ============================================================================
   postfix:
     image: ${POSTFIX_IMAGE:-ghcr.io/dextaafrica/postfix:latest}
@@ -87,7 +47,7 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # 3. Core Enterprise Backend API (Go)
+  # 2. Core Enterprise Backend API (Go)
   # ============================================================================
   api:
     image: ${BACKEND_IMAGE:-ghcr.io/dextaafrica/backend:latest}
@@ -130,6 +90,7 @@ services:
         aliases:
           - backend
           - api
+      traefik-public: {}
     deploy:
       resources:
         limits:
@@ -145,6 +106,7 @@ services:
         max-file: "5"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
       # Strict Auth Rate Limiter Router (5 req/sec, burst 10)
       - "traefik.http.routers.backend-auth.rule=Host(`${API_DOMAIN:-api.dextaafrica.com}`) && (PathPrefix(`/api/v1/admin/login`) || PathPrefix(`/api/v1/auth`))"
       - "traefik.http.routers.backend-auth.priority=100"
@@ -172,7 +134,7 @@ services:
       start_period: 15s
 
   # ============================================================================
-  # 4. Next.js Public Web Application
+  # 3. Next.js Public Web Application
   # ============================================================================
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/dextaafrica/frontend:latest}
@@ -202,6 +164,7 @@ services:
         condition: service_healthy
     networks:
       - dexta_network
+      - traefik-public
     deploy:
       resources:
         limits:
@@ -217,6 +180,7 @@ services:
         max-file: "5"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
@@ -230,7 +194,7 @@ services:
       start_period: 20s
 
   # ============================================================================
-  # 5. Next.js Operations & Admin Command Portal
+  # 4. Next.js Operations & Admin Command Portal
   # ============================================================================
   admin:
     image: ${ADMIN_PORTAL_IMAGE:-ghcr.io/dextaafrica/admin-portal:latest}
@@ -283,6 +247,7 @@ services:
         aliases:
           - admin-portal
           - admin
+      traefik-public: {}
     deploy:
       resources:
         limits:
@@ -298,6 +263,7 @@ services:
         max-file: "5"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
       # Strict Auth Rate Limiter Router (5 req/sec, burst 10)
       - "traefik.http.routers.admin-auth.rule=(Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`)) && (PathPrefix(`/api/auth`) || PathPrefix(`/api/it/mfa`) || PathPrefix(`/login`))"
       - "traefik.http.routers.admin-auth.priority=100"
@@ -319,7 +285,7 @@ services:
       start_period: 25s
 
   # ============================================================================
-  # 6. Database Migration Runner (Ephemeral Job)
+  # 5. Database Migration Runner (Ephemeral Job)
   # ============================================================================
   migrate:
     image: ${BACKEND_IMAGE:-ghcr.io/dextaafrica/backend:latest}
@@ -328,17 +294,16 @@ services:
       dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
     container_name: dexta_migrate
     restart: "no"
-    command: ["/app/api", "migrate"]
+    command: ["/app/api"]
     environment:
       - APP_ENV=production
       - DATABASE_URL=${DATABASE_URL:-postgres://${POSTGRES_USER:-dexta}:${POSTGRES_PASSWORD:-dexta_secret_2026}@postgres:5432/${POSTGRES_DB:-dexta_prod}?sslmode=disable}
       - DATABASE_AUTO_MIGRATE=true
-      - MIGRATE_ONLY=true
     networks:
       - dexta_network
 
   # ============================================================================
-  # 7. Production PostgreSQL Database (Optional when using Cloud Supabase)
+  # 6. Production PostgreSQL Database (Optional when using Cloud Supabase)
   # ============================================================================
   postgres:
     image: postgres:16-alpine
@@ -374,7 +339,7 @@ services:
       start_period: 10s
 
   # ============================================================================
-  # 8. Production Redis Cache & Message Broker
+  # 7. Production Redis Cache & Message Broker
   # ============================================================================
   redis:
     image: redis:7-alpine
@@ -419,9 +384,11 @@ volumes:
     name: dexta_postfix_spool
 
 # ==============================================================================
-# Isolated Enterprise Network
+# Enterprise Networks (Internal Isolation + Shared Ingress)
 # ==============================================================================
 networks:
   dexta_network:
     name: dexta_network
     driver: bridge
+  traefik-public:
+    external: true

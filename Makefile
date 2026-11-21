@@ -50,7 +50,7 @@ update: preflight pull-infra pull-images migrate rollout wait-healthy prune ## R
 rollback: ## Emergency rollback: deactivate maintenance page and restore last stable running containers
 	@echo -e "$(YELLOW)==>$(NC) Triggering emergency rollback..."
 	@$(MAKE) maintenance-off
-	@$(COMPOSE) up -d redis traefik postfix api frontend admin
+	@$(COMPOSE) up -d redis postfix api frontend admin
 	@echo -e "$(GREEN)[OK]$(NC) Rollback complete. Inspect logs with 'make logs'."
 
 .PHONY: pull-infra
@@ -82,8 +82,8 @@ migrate:
 
 .PHONY: rollout
 rollout:
-	@echo "==> Rolling out redis, traefik, postfix, api, frontend, admin"
-	@$(COMPOSE) up -d redis traefik postfix api frontend admin
+	@echo "==> Rolling out redis, postfix, api, frontend, admin"
+	@$(COMPOSE) up -d redis postfix api frontend admin
 
 .PHONY: wait-healthy
 wait-healthy:

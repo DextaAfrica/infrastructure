@@ -11,7 +11,7 @@ services:
     volumes:
       - ./prod/maintenance:/usr/share/nginx/html:ro
     networks:
-      - dexta_network
+      - traefik-public
     deploy:
       resources:
         limits:
@@ -22,9 +22,14 @@ services:
           memory: 32M
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
       # Top Priority Router (1000): Intercepts all traffic while maintenance is active
-      - "traefik.http.routers.maintenance.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`) || Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`) || Host(`${API_DOMAIN:-api.dextaafrica.com}`)"
-      - "traefik.http.routers.maintenance.priority=1000"
-      - "traefik.http.routers.maintenance.entrypoints=websecure"
-      - "traefik.http.routers.maintenance.tls.certresolver=letsencrypt"
-      - "traefik.http.services.maintenance.loadbalancer.server.port=80"
+      - "traefik.http.routers.dexta-maintenance.rule=Host(`${DOMAIN:-dextaafrica.com}`) || Host(`${WWW_DOMAIN:-www.dextaafrica.com}`) || Host(`${ADMIN_DOMAIN:-admin.dextaafrica.com}`) || Host(`${OPS_DOMAIN:-ops.dextaafrica.com}`) || Host(`${API_DOMAIN:-api.dextaafrica.com}`)"
+      - "traefik.http.routers.dexta-maintenance.priority=1000"
+      - "traefik.http.routers.dexta-maintenance.entrypoints=websecure"
+      - "traefik.http.routers.dexta-maintenance.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dexta-maintenance.loadbalancer.server.port=80"
+
+networks:
+  traefik-public:
+    external: true
