@@ -23,8 +23,27 @@ jobs:
     name: Build & Publish API Gateway
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Backend Code
         uses: actions/checkout@v4
+        with:
+          repository: DextaAfrica/Backend
+          ref: main
+          token: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          path: Backend
+
+      - name: Determine Docker Context
+        id: ctx
+        run: |
+          if [ -f "./Backend/Backend/Dockerfile" ]; then
+            echo "context=./Backend/Backend" >> $GITHUB_OUTPUT
+            echo "file=./Backend/Backend/Dockerfile" >> $GITHUB_OUTPUT
+          elif [ -f "./Backend/Dockerfile" ]; then
+            echo "context=./Backend" >> $GITHUB_OUTPUT
+            echo "file=./Backend/Dockerfile" >> $GITHUB_OUTPUT
+          else
+            echo "context=." >> $GITHUB_OUTPUT
+            echo "file=./Dockerfile" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -40,7 +59,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/dexta-api
+          images: |
+            ghcr.io/dextaafrica/backend
+            ghcr.io/dextaafrica/dexta-api
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest
@@ -50,8 +71,8 @@ jobs:
       - name: Build and Push OCI Image
         uses: docker/build-push-action@v5
         with:
-          context: ./Backend/Backend
-          file: ./Backend/Backend/Dockerfile
+          context: ${{ steps.ctx.outputs.context }}
+          file: ${{ steps.ctx.outputs.file }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -62,8 +83,27 @@ jobs:
     name: Build & Publish Frontend Web
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Frontend Code
         uses: actions/checkout@v4
+        with:
+          repository: DextaAfrica/Frontend
+          ref: main
+          token: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          path: Frontend
+
+      - name: Determine Docker Context
+        id: ctx
+        run: |
+          if [ -f "./Frontend/Dockerfile.prod" ]; then
+            echo "context=./Frontend" >> $GITHUB_OUTPUT
+            echo "file=./Frontend/Dockerfile.prod" >> $GITHUB_OUTPUT
+          elif [ -f "./Frontend/Dockerfile" ]; then
+            echo "context=./Frontend" >> $GITHUB_OUTPUT
+            echo "file=./Frontend/Dockerfile" >> $GITHUB_OUTPUT
+          else
+            echo "context=." >> $GITHUB_OUTPUT
+            echo "file=./Dockerfile" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -79,7 +119,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/dexta-frontend
+          images: |
+            ghcr.io/dextaafrica/frontend
+            ghcr.io/dextaafrica/dexta-frontend
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest
@@ -89,8 +131,8 @@ jobs:
       - name: Build and Push OCI Image
         uses: docker/build-push-action@v5
         with:
-          context: ./Frontend
-          file: ./Frontend/Dockerfile.prod
+          context: ${{ steps.ctx.outputs.context }}
+          file: ${{ steps.ctx.outputs.file }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -101,8 +143,27 @@ jobs:
     name: Build & Publish Admin Portal
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Admin Portal Code
         uses: actions/checkout@v4
+        with:
+          repository: DextaAfrica/Admin-portal
+          ref: main
+          token: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+          path: Admin-portal
+
+      - name: Determine Docker Context
+        id: ctx
+        run: |
+          if [ -f "./Admin-portal/Dockerfile" ]; then
+            echo "context=./Admin-portal" >> $GITHUB_OUTPUT
+            echo "file=./Admin-portal/Dockerfile" >> $GITHUB_OUTPUT
+          elif [ -f "./Admin-portal/Dockerfile.prod" ]; then
+            echo "context=./Admin-portal" >> $GITHUB_OUTPUT
+            echo "file=./Admin-portal/Dockerfile.prod" >> $GITHUB_OUTPUT
+          else
+            echo "context=." >> $GITHUB_OUTPUT
+            echo "file=./Dockerfile" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -118,7 +179,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/dexta-admin
+          images: |
+            ghcr.io/dextaafrica/admin-portal
+            ghcr.io/dextaafrica/dexta-admin
           tags: |
             type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest
@@ -128,8 +191,8 @@ jobs:
       - name: Build and Push OCI Image
         uses: docker/build-push-action@v5
         with:
-          context: ./Admin-portal
-          file: ./Admin-portal/Dockerfile
+          context: ${{ steps.ctx.outputs.context }}
+          file: ${{ steps.ctx.outputs.file }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
