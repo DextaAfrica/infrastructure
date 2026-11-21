@@ -23,7 +23,7 @@ cat <<EOF > /etc/postfix/sasl_passwd
 EOF
 
 chmod 600 /etc/postfix/sasl_passwd
-postmap /etc/postfix/sasl_passwd
+postmap lmdb:/etc/postfix/sasl_passwd
 rm -f /etc/postfix/sasl_passwd # remove cleartext file after hashing
 
 # Configure Postfix parameters in main.cf
@@ -38,7 +38,7 @@ postconf -e "mydestination = localhost.\$mydomain, localhost"
 # Relay through Brevo SMTP
 postconf -e "relayhost = [${BREVO_HOST}]:${BREVO_PORT}"
 postconf -e "smtp_sasl_auth_enable = yes"
-postconf -e "smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd"
+postconf -e "smtp_sasl_password_maps = lmdb:/etc/postfix/sasl_passwd"
 postconf -e "smtp_sasl_security_options = noanonymous"
 postconf -e "smtp_sasl_tls_security_options = noanonymous"
 postconf -e "smtp_sasl_mechanism_filter = plain, login"
