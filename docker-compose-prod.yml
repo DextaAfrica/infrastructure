@@ -127,7 +127,7 @@ services:
       - "traefik.http.routers.backend-path.middlewares=secHeaders@file,compressAll@file,rateLimitApi@file"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -187,7 +187,7 @@ services:
       - "traefik.http.routers.frontend.middlewares=secHeaders@file,compressAll@file,rateLimitGeneral@file"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/api/health || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -278,7 +278,7 @@ services:
       - "traefik.http.routers.admin.middlewares=adminSecHeaders@file,compressAll@file,rateLimitGeneral@file,largeBodyBuffering@file"
       - "traefik.http.services.admin.loadbalancer.server.port=3000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/api/health || curl -f http://127.0.0.1:3000/api/health || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 3
