@@ -22,6 +22,9 @@ jobs:
   build-and-push-api:
     name: Build & Publish API Gateway
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout Backend Code
         uses: actions/checkout@v4
@@ -52,8 +55,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GH_USERNAME || github.actor }}
+          password: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract Metadata & Tags
         id: meta
@@ -82,6 +85,9 @@ jobs:
   build-and-push-frontend:
     name: Build & Publish Frontend Web
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout Frontend Code
         uses: actions/checkout@v4
@@ -112,8 +118,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GH_USERNAME || github.actor }}
+          password: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract Metadata & Tags
         id: meta
@@ -142,6 +148,9 @@ jobs:
   build-and-push-admin:
     name: Build & Publish Admin Portal
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout Admin Portal Code
         uses: actions/checkout@v4
@@ -172,8 +181,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GH_USERNAME || github.actor }}
+          password: ${{ secrets.GH_PAT || secrets.ACTIONS_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract Metadata & Tags
         id: meta
