@@ -20,19 +20,19 @@ jobs:
   deploy:
     name: Deploy Image Updates to Production Cluster
     runs-on: ubuntu-latest
-    if: (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch') && secrets['PROD_SERVER_HOST'] != ''
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets['PROD_SERVER_HOST'] }}
-          username: ${{ secrets['PROD_SERVER_USER'] }}
-          key: ${{ secrets['PROD_SSH_PRIVATE_KEY'] }}
-          port: ${{ secrets['PROD_SSH_PORT'] || 22 }}
+          host: ${{ secrets.PROD_SERVER_HOST }}
+          username: ${{ secrets.PROD_SERVER_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
           script_stop: true
           script: |
             set -euo pipefail
-            DEPLOY_PATH="${{ secrets['PROD_DEPLOY_PATH'] || '/home/server/apps/dextaafrica/infra/prod' }}"
+            DEPLOY_PATH="${{ secrets.PROD_DEPLOY_PATH || '/home/server/apps/dextaafrica/infra/prod' }}"
             echo "==> Initiating production deployment at $DEPLOY_PATH..."
             cd "$DEPLOY_PATH"
             make deploy
