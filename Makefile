@@ -150,6 +150,10 @@ build: ## Optional local build of container images (Usage: make build or make bu
 		$(COMPOSE) build api frontend admin; \
 	fi
 
+.PHONY: setup-mailcow
+setup-mailcow: ## Install and configure Mailcow Dockerized with Traefik bridge
+	@./scripts/setup-mailcow.sh
+
 # ------------------------------------------------------------------------------
 # Database & Persistence Operations
 # ------------------------------------------------------------------------------
