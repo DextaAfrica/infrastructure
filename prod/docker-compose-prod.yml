@@ -150,9 +150,27 @@ services:
       - PORT=3000
       - DATABASE_URL=${ADMIN_DATABASE_URL:-file:/app/prisma/admin_portal.db}
       - APP_SECRET=${ADMIN_APP_SECRET}
+      - NEXT_PUBLIC_APP_URL=${ADMIN_URL:-https://admin.dextaafrica.com}
       - BACKEND_API_URL=http://api:8080
       - NEXT_PUBLIC_API_URL=${API_URL:-https://api.dextaafrica.com}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-.dextaafrica.com}
+      # Cloudflare R2 Cloud Object Storage
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-e9b3685f470b0935209bd7e768109d2a}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-dextaafricastorage}
+      - R2_PUBLIC_URL=${R2_PUBLIC_URL}
+      # AWS S3 Storage Fallback
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET_NAME=${AWS_S3_BUCKET_NAME:-dextaafricastorage}
+      # Enterprise Email SMTP Dispatcher
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM:-Dexta Operations <operations@dextaafrica.com>}
     networks:
       - dexta_prod_network
     volumes:

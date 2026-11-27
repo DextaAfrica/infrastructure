@@ -1,0 +1,24 @@
+# ==============================================================================
+# Mailcow Dockerized Reverse Proxy Configuration for Shared Traefik
+# File: ~/apps/proxy/traefik/dynamic/mailcow.yml
+# ==============================================================================
+
+http:
+  routers:
+    mailcow-web:
+      rule: "Host(`mail.dextaafrica.com`) || Host(`autodiscover.dextaafrica.com`) || Host(`autoconfig.dextaafrica.com`)"
+      entrypoints:
+        - websecure
+      tls:
+        certresolver: letsencrypt
+      service: mailcow-service
+      middlewares:
+        - secHeaders@file
+        - compressAll@file
+
+  services:
+    mailcow-service:
+      loadBalancer:
+        servers:
+          # Points to nginx-mailcow internal port over Docker network (or host gateway)
+          - url: "http://nginx-mailcow:80"
