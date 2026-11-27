@@ -75,8 +75,10 @@ services:
       - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL}
       - ADMIN_BOOTSTRAP_EMAIL=${ADMIN_BOOTSTRAP_EMAIL}
       - ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
-      - SMTP_HOST=postfix
-      - SMTP_PORT=587
+      - SMTP_HOST=${SMTP_HOST:-mail.dextaafrica.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
     depends_on:
       redis:
         condition: service_healthy
@@ -225,11 +227,11 @@ services:
       - ADMIN_REGISTRATION_PASSCODE=${ADMIN_REGISTRATION_PASSCODE}
       - AUTO_MIGRATE=true
       - AUTO_SEED=true
-      - SMTP_HOST=postfix
-      - SMTP_PORT=587
-      - SMTP_USER=
-      - SMTP_PASS=
-      - EMAIL_FROM=${EMAIL_FROM:-operations@dextaafrica.com}
+      - SMTP_HOST=${SMTP_HOST:-mail.dextaafrica.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - EMAIL_FROM=${EMAIL_FROM:-Dexta Africa <marketing@dextaafrica.com>}
       - AWS_REGION=${AWS_REGION:-auto}
       - AWS_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY:-}

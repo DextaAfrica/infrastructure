@@ -60,6 +60,8 @@ sed -i.bak \
     -e 's|^HTTPS_PORT=.*|HTTPS_PORT=8443|' \
     -e 's|^HTTPS_BIND=.*|HTTPS_BIND=127.0.0.1|' \
     -e 's|^SKIP_LETS_ENCRYPT=.*|SKIP_LETS_ENCRYPT=y|' \
+    -e 's|^ENABLE_IPV6=.*|ENABLE_IPV6=false|' \
+    -e 's|^IPV4_NETWORK=.*|IPV4_NETWORK=172.30.1|' \
     mailcow.conf
 
 # Check memory constraint and optionally disable ClamAV if RAM < 8GB

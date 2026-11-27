@@ -3,8 +3,6 @@
 # Place this file at: /home/server/apps/mailcow/docker-compose.override.yml
 # ==============================================================================
 
-version: '2.1'
-
 services:
   nginx-mailcow:
     networks:
